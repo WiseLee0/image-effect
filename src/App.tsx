@@ -18,6 +18,7 @@ const App = () => {
     globalTemperature: 0,
     globalContrast: 0,
     highlightShadowThreshold: 0.5,
+    colorConversionType: 0,
   });
 
   const resize = (imageWidth: number, imageHeight: number) => {
@@ -57,7 +58,7 @@ const App = () => {
   const initWebGL = () => {
     if (!canvasRef.current) return;
     const gl = canvasRef.current.getContext("webgl2", {
-      premultipliedAlpha: false,
+      premultipliedAlpha: true,
     })!;
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.enable(gl.BLEND);
@@ -116,10 +117,19 @@ const App = () => {
     gl.uniform1f(uniformLocations.globalShadows, uniforms.globalShadows);
     gl.uniform1f(uniformLocations.globalHighlights, uniforms.globalHighlights);
     gl.uniform1f(uniformLocations.globalExposure, uniforms.globalExposure);
-    gl.uniform1f(uniformLocations.globalTemperature, uniforms.globalTemperature);
+    gl.uniform1f(
+      uniformLocations.globalTemperature,
+      uniforms.globalTemperature
+    );
     gl.uniform1f(uniformLocations.globalContrast, uniforms.globalContrast);
-    gl.uniform1f(uniformLocations.highlightShadowThreshold, 0.5);
-    gl.uniform1i(uniformLocations.colorConversionType, 0);
+    gl.uniform1f(
+      uniformLocations.highlightShadowThreshold,
+      uniforms.highlightShadowThreshold
+    );
+    gl.uniform1i(
+      uniformLocations.colorConversionType,
+      uniforms.colorConversionType
+    );
     gl.uniform1f(uniformLocations.alpha, 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
