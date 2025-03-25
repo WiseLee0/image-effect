@@ -146,30 +146,37 @@ const App = () => {
     };
     gui
       .add(uniformsRef.current, "globalExposure", -1.0, 1.0)
+      .name("曝光")
       .step(0.01)
       .onChange(updateUniform);
     gui
       .add(uniformsRef.current, "globalContrast", -0.3, 0.3)
+      .name("对比度")
       .step(0.01)
       .onChange(updateUniform);
     gui
       .add(uniformsRef.current, "globalColor", -1.0, 1.0)
+      .name("饱和度")
       .step(0.01)
       .onChange(updateUniform);
     gui
       .add(uniformsRef.current, "globalTemperature", -1.0, 1.0)
+      .name("色温")
       .step(0.01)
       .onChange(updateUniform);
     gui
       .add(uniformsRef.current, "globalTint", -1.0, 1.0)
+      .name("色调")
       .step(0.01)
       .onChange(updateUniform);
     gui
       .add(uniformsRef.current, "globalHighlights", -1.0, 1.0)
+      .name("高光")
       .step(0.01)
       .onChange(updateUniform);
     gui
       .add(uniformsRef.current, "globalShadows", -1.0, 1.0)
+      .name("阴影")
       .step(0.01)
       .onChange(updateUniform);
     gui.add(controls, "replaceImage").name("替换图片 Click me");
