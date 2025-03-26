@@ -144,8 +144,8 @@ const BlendComponent = () => {
     const imageBitmap1 = await createImageBitmap(canvas1);
     const imageBitmap2 = await createImageBitmap(canvas2);
 
-    createTextureFromImageBitmap(glRef.current!, imageBitmap1, 0);
-    createTextureFromImageBitmap(glRef.current!, imageBitmap2, 1);
+    createTextureFromImageBitmap(glRef.current!, imageBitmap1, 1);
+    createTextureFromImageBitmap(glRef.current!, imageBitmap2, 0);
 
     resize(400, 400);
     drawScene();
