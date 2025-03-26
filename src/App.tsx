@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import FilterComponent from "./filter";
 import image1 from "./image1.jpg";
 import image2 from "./image2.jpeg";

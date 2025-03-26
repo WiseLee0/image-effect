@@ -216,7 +216,7 @@ const FilterComponent = ({
         .arrayBuffer()
         .then((buffer: ArrayBuffer) => new Blob([buffer]));
       const imageBitmap = await createImageBitmap(blob);
-      createTextureFromImageBitmap(glRef.current!, imageBitmap);
+      createTextureFromImageBitmap(glRef.current!, imageBitmap, 0);
       resize(imageBitmap.width, imageBitmap.height);
       drawScene();
     });
