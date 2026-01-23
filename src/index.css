@@ -1,0 +1,19 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&display=swap");
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Hiragino Sans GB", "Noto Sans SC", "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+  background: #0b0c0f;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
