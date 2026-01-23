@@ -67,6 +67,11 @@ uniform float globalTemperature;
 uniform float globalContrast;
 uniform float highlightShadowThreshold;
 uniform float alpha;
+uniform float brightness;
+uniform float whites;
+uniform float blacks;
+uniform float hue;
+uniform float vibrance;
 const vec3 RGB2Y = vec3(0.2126f, 0.7152f, 0.0722f);
 vec3 colorToLinear(vec3 color) {
     color = pow(color, vec3(2.2f));
@@ -138,6 +143,50 @@ vec3 adjustTempTintContrast(vec3 color, float temp, float tint, float contrast) 
     color = clamp(color, 0.0f, 1.0f);
     return color;
 }
+vec3 rgb2hsv(vec3 c) {
+    vec4 K = vec4(0.0f, -1.0f / 3.0f, 2.0f / 3.0f, -1.0f);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10f;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0f * d + e)), d / (q.x + e), q.x);
+}
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0f, 2.0f / 3.0f, 1.0f / 3.0f, 3.0f);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0f - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0f, 1.0f), c.y);
+}
+vec3 adjustBrightness(vec3 color, float brightnessAdjust) {
+    color += brightnessAdjust;
+    return clamp(color, 0.0f, 1.0f);
+}
+vec3 adjustWhites(vec3 color, float whitesAdjust) {
+    float lum = dot(color, RGB2Y);
+    float whiteMask = smoothstep(0.5f, 1.0f, lum);
+    color += whitesAdjust * whiteMask;
+    return clamp(color, 0.0f, 1.0f);
+}
+vec3 adjustBlacks(vec3 color, float blacksAdjust) {
+    float lum = dot(color, RGB2Y);
+    float blackMask = smoothstep(0.5f, 0.0f, lum);
+    color += blacksAdjust * blackMask;
+    return clamp(color, 0.0f, 1.0f);
+}
+vec3 adjustHue(vec3 color, float hueAdjust) {
+    float hueShift = hueAdjust * 0.5f;
+    vec3 hsv = rgb2hsv(color);
+    hsv.x = fract(hsv.x + hueShift);
+    return hsv2rgb(hsv);
+}
+vec3 adjustVibrance(vec3 color, float vibranceAdjust) {
+    vec3 hsv = rgb2hsv(color);
+    float saturation = hsv.y;
+    // 对低饱和度颜色增加更多，对高饱和度颜色增加较少
+    float mask = 1.0f - saturation;
+    float adjustment = vibranceAdjust * mask;
+    hsv.y = clamp(saturation + adjustment, 0.0f, 1.0f);
+    return hsv2rgb(hsv);
+}
 vec3 pipeline(vec3 color) {
     color = colorToLinear(color);
     float originalRangeFactor = rangeFactor(color, globalShadows, globalHighlights);
@@ -145,6 +194,11 @@ vec3 pipeline(vec3 color) {
     color = adjustExposure(color, globalExposure + originalRangeFactor);
     color = adjustColor(color, clamp(globalColor, -1.0f, 1.0f));
     color = colorFromLinear(color);
+    color = adjustBrightness(color, brightness);
+    color = adjustWhites(color, whites);
+    color = adjustBlacks(color, blacks);
+    color = adjustHue(color, hue);
+    color = adjustVibrance(color, vibrance);
     return color;
 }
 

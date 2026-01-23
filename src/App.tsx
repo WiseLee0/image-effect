@@ -10,15 +10,20 @@ const App = () => {
   const glRef = useRef<WebGLRenderingContext>(null);
   const programRef = useRef<WebGLProgram>(null);
   const uniformsRef = useRef<any>({
-    globalTint: 0,
-    globalColor: 0,
-    globalShadows: 0,
-    globalHighlights: 0,
-    globalExposure: 0,
-    globalTemperature: 0,
-    globalContrast: 0,
+    tint: 0,
+    color: 0,
+    shadows: 0,
+    highlights: 0,
+    exposure: 0,
+    temperature: 0,
+    contrast: 0,
     highlightShadowThreshold: 0.5,
     colorConversionType: 0,
+    brightness: 0,
+    whites: 0,
+    blacks: 0,
+    hue: 0,
+    vibrance: 0,
   });
 
   const resize = (imageWidth: number, imageHeight: number) => {
@@ -95,13 +100,13 @@ const App = () => {
     if (!gl || !program || !uniforms) return;
     gl.useProgram(program);
     const uniformLocations = {
-      globalTint: gl.getUniformLocation(program, "globalTint"),
-      globalColor: gl.getUniformLocation(program, "globalColor"),
-      globalShadows: gl.getUniformLocation(program, "globalShadows"),
-      globalHighlights: gl.getUniformLocation(program, "globalHighlights"),
-      globalExposure: gl.getUniformLocation(program, "globalExposure"),
-      globalTemperature: gl.getUniformLocation(program, "globalTemperature"),
-      globalContrast: gl.getUniformLocation(program, "globalContrast"),
+      tint: gl.getUniformLocation(program, "globalTint"),
+      color: gl.getUniformLocation(program, "globalColor"),
+      shadows: gl.getUniformLocation(program, "globalShadows"),
+      highlights: gl.getUniformLocation(program, "globalHighlights"),
+      exposure: gl.getUniformLocation(program, "globalExposure"),
+      temperature: gl.getUniformLocation(program, "globalTemperature"),
+      contrast: gl.getUniformLocation(program, "globalContrast"),
       highlightShadowThreshold: gl.getUniformLocation(
         program,
         "highlightShadowThreshold"
@@ -111,17 +116,22 @@ const App = () => {
         "colorConversionType"
       ),
       alpha: gl.getUniformLocation(program, "alpha"),
+      brightness: gl.getUniformLocation(program, "brightness"),
+      whites: gl.getUniformLocation(program, "whites"),
+      blacks: gl.getUniformLocation(program, "blacks"),
+      hue: gl.getUniformLocation(program, "hue"),
+      vibrance: gl.getUniformLocation(program, "vibrance"),
     };
-    gl.uniform1f(uniformLocations.globalTint, uniforms.globalTint);
-    gl.uniform1f(uniformLocations.globalColor, uniforms.globalColor);
-    gl.uniform1f(uniformLocations.globalShadows, uniforms.globalShadows);
-    gl.uniform1f(uniformLocations.globalHighlights, uniforms.globalHighlights);
-    gl.uniform1f(uniformLocations.globalExposure, uniforms.globalExposure);
+    gl.uniform1f(uniformLocations.tint, uniforms.tint);
+    gl.uniform1f(uniformLocations.color, uniforms.color);
+    gl.uniform1f(uniformLocations.shadows, uniforms.shadows);
+    gl.uniform1f(uniformLocations.highlights, uniforms.highlights);
+    gl.uniform1f(uniformLocations.exposure, uniforms.exposure);
     gl.uniform1f(
-      uniformLocations.globalTemperature,
-      uniforms.globalTemperature
+      uniformLocations.temperature,
+      uniforms.temperature
     );
-    gl.uniform1f(uniformLocations.globalContrast, uniforms.globalContrast);
+    gl.uniform1f(uniformLocations.contrast, uniforms.contrast);
     gl.uniform1f(
       uniformLocations.highlightShadowThreshold,
       uniforms.highlightShadowThreshold
@@ -131,6 +141,11 @@ const App = () => {
       uniforms.colorConversionType
     );
     gl.uniform1f(uniformLocations.alpha, 1);
+    gl.uniform1f(uniformLocations.brightness, uniforms.brightness);
+    gl.uniform1f(uniformLocations.whites, uniforms.whites);
+    gl.uniform1f(uniformLocations.blacks, uniforms.blacks);
+    gl.uniform1f(uniformLocations.hue, uniforms.hue);
+    gl.uniform1f(uniformLocations.vibrance, uniforms.vibrance);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
 
@@ -145,33 +160,61 @@ const App = () => {
       drawScene();
     };
     gui
-      .add(uniformsRef.current, "globalExposure", -1.0, 1.0)
+      .add(uniformsRef.current, "brightness", -1.0, 1.0)
+      .step(0.01)
+      .name("Brightness")
+      .onChange(updateUniform);
+    gui
+      .add(uniformsRef.current, "exposure", -1.0, 1.0)
       .step(0.01)
       .onChange(updateUniform);
     gui
-      .add(uniformsRef.current, "globalContrast", -0.3, 0.3)
+      .add(uniformsRef.current, "contrast", -0.3, 0.3)
       .step(0.01)
       .onChange(updateUniform);
     gui
-      .add(uniformsRef.current, "globalColor", -1.0, 1.0)
+      .add(uniformsRef.current, "highlights", -1.0, 1.0)
       .step(0.01)
       .onChange(updateUniform);
     gui
-      .add(uniformsRef.current, "globalTemperature", -1.0, 1.0)
+      .add(uniformsRef.current, "shadows", -1.0, 1.0)
       .step(0.01)
       .onChange(updateUniform);
     gui
-      .add(uniformsRef.current, "globalTint", -1.0, 1.0)
+      .add(uniformsRef.current, "whites", -1.0, 1.0)
+      .step(0.01)
+      .name("Whites")
+      .onChange(updateUniform);
+    gui
+      .add(uniformsRef.current, "blacks", -1.0, 1.0)
+      .step(0.01)
+      .name("Blacks")
+      .onChange(updateUniform);
+    gui
+      .add(uniformsRef.current, "vibrance", -1.0, 1.0)
+      .step(0.01)
+      .name("Vibrance")
+      .onChange(updateUniform);
+    gui
+      .add(uniformsRef.current, "color", -1.0, 1.0)
+      .name("saturation")
       .step(0.01)
       .onChange(updateUniform);
     gui
-      .add(uniformsRef.current, "globalHighlights", -1.0, 1.0)
+      .add(uniformsRef.current, "temperature", -1.0, 1.0)
       .step(0.01)
       .onChange(updateUniform);
     gui
-      .add(uniformsRef.current, "globalShadows", -1.0, 1.0)
+      .add(uniformsRef.current, "tint", -1.0, 1.0)
       .step(0.01)
       .onChange(updateUniform);
+    gui
+      .add(uniformsRef.current, "hue", -1.0, 1.0)
+      .step(0.01)
+      .name("Hue")
+      .onChange(updateUniform);
+
+
     gui.add(controls, "replaceImage").name("替换图片 Click me");
   };
 
