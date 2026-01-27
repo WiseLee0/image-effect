@@ -700,11 +700,13 @@ void main() {
 
 const grainFragment = `
 precision highp float;
-varying vec2 vUv;
 uniform sampler2D uTexture;
+varying vec2 vUv;
 uniform vec2 uResolution;
 uniform float uAmount;
 uniform float uTime;
+const float permTexUnit = 1.0 / 256.0;
+const float permTexUnitHalf = 0.5 / 256.0;
 float grainsize = 1.8;
 float lumamount = 1.0;
 
@@ -720,27 +722,27 @@ float fade(in float t) {
   return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
 }
 float pnoise3D(in vec3 p) {
-  vec3 pi = (1.0 / 256.0) * floor(p) + (0.5 / 256.0);
+  vec3 pi = permTexUnit * floor(p) + permTexUnitHalf;
   vec3 pf = fract(p);
   float perm00 = rnm(pi.xy).a;
   vec3 grad000 = rnm(vec2(perm00, pi.z)).rgb * 4.0 - 1.0;
   float n000 = dot(grad000, pf);
-  vec3 grad001 = rnm(vec2(perm00, pi.z + (1.0 / 256.0))).rgb * 4.0 - 1.0;
+  vec3 grad001 = rnm(vec2(perm00, pi.z + permTexUnit)).rgb * 4.0 - 1.0;
   float n001 = dot(grad001, pf - vec3(0.0, 0.0, 1.0));
-  float perm01 = rnm(pi.xy + vec2(0.0, 1.0 / 256.0)).a;
+  float perm01 = rnm(pi.xy + vec2(0.0, permTexUnit)).a;
   vec3 grad010 = rnm(vec2(perm01, pi.z)).rgb * 4.0 - 1.0;
   float n010 = dot(grad010, pf - vec3(0.0, 1.0, 0.0));
-  vec3 grad011 = rnm(vec2(perm01, pi.z + (1.0 / 256.0))).rgb * 4.0 - 1.0;
+  vec3 grad011 = rnm(vec2(perm01, pi.z + permTexUnit)).rgb * 4.0 - 1.0;
   float n011 = dot(grad011, pf - vec3(0.0, 1.0, 1.0));
-  float perm10 = rnm(pi.xy + vec2(1.0 / 256.0, 0.0)).a;
+  float perm10 = rnm(pi.xy + vec2(permTexUnit, 0.0)).a;
   vec3 grad100 = rnm(vec2(perm10, pi.z)).rgb * 4.0 - 1.0;
   float n100 = dot(grad100, pf - vec3(1.0, 0.0, 0.0));
-  vec3 grad101 = rnm(vec2(perm10, pi.z + (1.0 / 256.0))).rgb * 4.0 - 1.0;
+  vec3 grad101 = rnm(vec2(perm10, pi.z + permTexUnit)).rgb * 4.0 - 1.0;
   float n101 = dot(grad101, pf - vec3(1.0, 0.0, 1.0));
-  float perm11 = rnm(pi.xy + vec2(1.0 / 256.0, 1.0 / 256.0)).a;
+  float perm11 = rnm(pi.xy + vec2(permTexUnit, permTexUnit)).a;
   vec3 grad110 = rnm(vec2(perm11, pi.z)).rgb * 4.0 - 1.0;
   float n110 = dot(grad110, pf - vec3(1.0, 1.0, 0.0));
-  vec3 grad111 = rnm(vec2(perm11, pi.z + (1.0 / 256.0))).rgb * 4.0 - 1.0;
+  vec3 grad111 = rnm(vec2(perm11, pi.z + permTexUnit)).rgb * 4.0 - 1.0;
   float n111 = dot(grad111, pf - vec3(1.0, 1.0, 1.0));
   vec4 n_x = mix(vec4(n000, n001, n010, n011), vec4(n100, n101, n110, n111), fade(pf.x));
   vec2 n_xy = mix(n_x.xy, n_x.zw, fade(pf.y));
@@ -1132,8 +1134,7 @@ const App = () => {
           programs,
           targets,
         },
-        settingsRef.current,
-        0
+        settingsRef.current
       );
     };
     image.src = imageSrc;
@@ -1145,31 +1146,7 @@ const App = () => {
   useEffect(() => {
     if (!resourcesRef.current) return;
     const resources = resourcesRef.current;
-    const { gl } = resources;
-
-    let frameId = 0;
-    let lastTime = 0;
-
-    const render = (time: number) => {
-      const settings = settingsRef.current;
-      const now = time * 0.001;
-      if (Math.abs(settings.grain) > 0.01) {
-        frameId = requestAnimationFrame(render);
-      }
-      lastTime = now;
-      drawFrame(resources, settings, now);
-    };
-
-    drawFrame(resources, settingsRef.current, lastTime);
-
-    if (Math.abs(settings.grain) > 0.01) {
-      frameId = requestAnimationFrame(render);
-    }
-
-    return () => {
-      if (frameId) cancelAnimationFrame(frameId);
-      gl.flush();
-    };
+    drawFrame(resources, settingsRef.current);
   }, [settings]);
 
   const updateSetting =
@@ -1420,7 +1397,7 @@ const Slider = ({
   );
 };
 
-const drawFrame = (resources: WebGLResources, settings: Settings, time: number) => {
+const drawFrame = (resources: WebGLResources, settings: Settings) => {
   const {
     gl,
     width,
@@ -1635,8 +1612,8 @@ const drawFrame = (resources: WebGLResources, settings: Settings, time: number) 
 
   drawPass(programs.grain, () => {
     gl.uniform2f(programs.grain.uniforms.uResolution, width, height);
-    gl.uniform1f(programs.grain.uniforms.uAmount, settings.grain / 100);
-    gl.uniform1f(programs.grain.uniforms.uTime, time);
+    gl.uniform1f(programs.grain.uniforms.uAmount, settings.grain / 800);
+    gl.uniform1f(programs.grain.uniforms.uTime, 0);
   }, swapTarget());
 
   drawPass(programs.pass, () => { }, null);
