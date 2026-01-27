@@ -1,0 +1,59 @@
+{
+  "name": "image-color-grading",
+  "version": "1.0.1",
+  "description": "基于 WebGL 的高性能图像调色库，支持亮度、对比度、饱和度、色温等 22+ 种调色参数",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "image",
+    "color",
+    "grading",
+    "filter",
+    "webgl",
+    "brightness",
+    "contrast",
+    "saturation",
+    "photo",
+    "edit",
+    "调色",
+    "图像处理"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "devDependencies": {
+    "terser": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "sideEffects": false
+}
