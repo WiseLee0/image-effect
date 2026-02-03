@@ -15,13 +15,30 @@
  *   saturation: 15 
  * });
  * 
+ * // 自动修复
+ * processor.autoFix();
+ * 
+ * // 或应用预设
+ * processor.applyPreset('pop');
+ * 
  * const dataUrl = processor.toDataURL();
  * ```
  */
 
-export { ImageColorGrading, defaultSettings } from './processor';
+export {
+  ImageColorGrading,
+  defaultSettings,
+  presets,
+  analyzeImage,
+  analyzeImageLevels,
+  analyzeImageVibrance,
+} from './processor';
+
 export type {
   ColorGradingSettings,
   PartialColorGradingSettings,
   ExportOptions,
+  ImageLevels,
+  ImageAnalysis,
+  PresetType,
 } from './types';

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, useCallback, type ChangeEvent } from "react";
 import "./App.css";
 import imageUrl from "./image.jpg";
 import {
@@ -62,10 +62,10 @@ const App = () => {
 
   const updateSetting =
     (key: keyof ColorGradingSettings) =>
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const value = Number(event.target.value);
-      setSettings((prev) => ({ ...prev, [key]: value }));
-    };
+      (event: ChangeEvent<HTMLInputElement>) => {
+        const value = Number(event.target.value);
+        setSettings((prev) => ({ ...prev, [key]: value }));
+      };
 
   const handleReplaceImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -92,10 +92,100 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
 
+  // 自动修复：分析图像并自动调整色阶和鲜艳度
+  const handleAutoFix = useCallback(() => {
+    const processor = processorRef.current;
+    if (!processor || !processor.isLoaded()) return;
+
+    const newSettings = processor.autoFix();
+    setSettings(newSettings);
+  }, []);
+
+  // 黑白效果
+  const handleBlackWhite = useCallback(() => {
+    const processor = processorRef.current;
+    if (!processor) return;
+
+    const newSettings = processor.applyPreset('blackAndWhite');
+    setSettings(newSettings);
+  }, []);
+
+  // 流行效果
+  const handlePop = useCallback(() => {
+    const processor = processorRef.current;
+    if (!processor) return;
+
+    const newSettings = processor.applyPreset('pop');
+    setSettings(newSettings);
+  }, []);
+
+  // 复古效果
+  const handleVintage = useCallback(() => {
+    const processor = processorRef.current;
+    if (!processor) return;
+
+    const newSettings = processor.applyPreset('vintage');
+    setSettings(newSettings);
+  }, []);
+
+  // 鲜艳效果
+  const handleVivid = useCallback(() => {
+    const processor = processorRef.current;
+    if (!processor) return;
+
+    const newSettings = processor.applyPreset('vivid');
+    setSettings(newSettings);
+  }, []);
+
+  // 电影效果
+  const handleCinematic = useCallback(() => {
+    const processor = processorRef.current;
+    if (!processor) return;
+
+    const newSettings = processor.applyPreset('cinematic');
+    setSettings(newSettings);
+  }, []);
+
   return (
     <div className="page">
       <div className="panel">
         <div className="reset-button">
+          <button
+            className="panel__reset"
+            onClick={handleAutoFix}
+          >
+            自动
+          </button>
+          <button
+            className="panel__reset"
+            onClick={handleBlackWhite}
+          >
+            黑白风格
+          </button>
+          <button
+            className="panel__reset"
+            onClick={handlePop}
+          >
+            流行风格
+          </button>
+          <button
+            className="panel__reset"
+            onClick={handleVintage}
+          >
+            复古风格
+          </button>
+          <button
+            className="panel__reset"
+            onClick={handleVivid}
+          >
+            鲜艳风格
+          </button>
+          <button
+            className="panel__reset"
+            onClick={handleCinematic}
+          >
+            电影风格
+          </button>
           <button
             className="panel__reset"
             onClick={() => setSettings(defaultSettings)}

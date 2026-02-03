@@ -5,6 +5,9 @@ import type {
   RenderTarget,
   WebGLResources,
   ExportOptions,
+  ImageLevels,
+  ImageAnalysis,
+  PresetType,
 } from './types';
 import * as shaders from './shaders';
 import {
@@ -43,6 +46,142 @@ export const defaultSettings: ColorGradingSettings = {
   vignette: 0,
   grain: 0,
 };
+
+/**
+ * 预设滤镜配置
+ */
+export const presets: Record<PresetType, PartialColorGradingSettings> = {
+  auto: {}, // 自动模式需要分析图像，这里只是占位
+  blackAndWhite: {
+    saturation: -100,
+    contrast: 20,
+    exposure: 10,
+    clarity: 10,
+  },
+  pop: {
+    highlights: 50,
+    shadows: -50,
+    vibrance: 50,
+    saturation: 20,
+    exposure: 20,
+    clarity: 20,
+  },
+  vintage: {
+    saturation: -20,
+    contrast: 10,
+    temperature: 15,
+    grain: 30,
+    vignette: 25,
+  },
+  vivid: {
+    vibrance: 40,
+    saturation: 20,
+    contrast: 15,
+    clarity: 20,
+  },
+  cinematic: {
+    contrast: 25,
+    highlights: -20,
+    shadows: 15,
+    temperature: -10,
+    vignette: 30,
+  },
+};
+
+/**
+ * 分析图像获取黑白色阶信息
+ * 使用直方图分析，忽略极端少数的像素值
+ * @param imageData - ImageData 对象
+ * @returns {black, white} 分别表示有效的最暗和最亮的亮度值 (0-255)
+ */
+export function analyzeImageLevels(imageData: ImageData): ImageLevels {
+  const { data, width, height } = imageData;
+
+  // 创建直方图数组 (0-255)
+  const histogram = new Array(256).fill(0);
+
+  // 统计每个颜色值的出现次数
+  for (let i = 0; i < data.length; i += 4) {
+    histogram[data[i]] += 1;     // R
+    histogram[data[i + 1]] += 1; // G
+    histogram[data[i + 2]] += 1; // B
+  }
+
+  // 阈值：忽略少于 0.1% 的像素
+  const threshold = Math.round((width * height) / 1e3);
+
+  // 从暗到亮找到第一个超过阈值的值作为黑色点
+  let black = 0;
+  for (let i = 0; i < 256; i++) {
+    if (histogram[i] > threshold) {
+      black = i;
+      break;
+    }
+  }
+
+  // 从亮到暗找到第一个超过阈值的值作为白色点
+  let white = 255;
+  for (let i = 255; i >= 0; i--) {
+    if (histogram[i] > threshold) {
+      white = i;
+      break;
+    }
+  }
+
+  // 限制范围，避免过度调整
+  if (black > 100) black = 100;
+  if (white < 155) white = 155;
+
+  return { black, white };
+}
+
+/**
+ * 分析图像的饱和度/鲜艳度
+ * 使用 HSV 色彩空间计算，返回 0-1 之间的值
+ * @param imageData - ImageData 对象
+ * @returns 鲜艳度值 (0-1)
+ */
+export function analyzeImageVibrance(imageData: ImageData): number {
+  const { data, width, height } = imageData;
+  let saturationSum = 1;  // 初始值为1，避免除零
+  let brightnessSum = 1;
+
+  // 遍历所有像素
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    const min = Math.min(r, g, b);
+    const max = Math.max(r, g, b);
+
+    // 累加亮度 (HSV 中的 Value)
+    brightnessSum += max / 255;
+
+    // 计算色度 (chroma)
+    const chroma = max - min;
+    if (chroma > 0) {
+      // HSV 饱和度 = chroma / max
+      saturationSum += chroma / max;
+    }
+  }
+
+  // 返回饱和度和亮度的平均值
+  const pixelCount = width * height;
+  return (saturationSum + brightnessSum) / (pixelCount * 2);
+}
+
+/**
+ * 分析图像
+ * @param imageData - ImageData 对象
+ * @returns 图像分析结果
+ */
+export function analyzeImage(imageData: ImageData): ImageAnalysis {
+  return {
+    levels: analyzeImageLevels(imageData),
+    vibrance: analyzeImageVibrance(imageData),
+  };
+}
 
 /**
  * 图像调色处理器
@@ -282,6 +421,90 @@ export class ImageColorGrading {
   dispose(): void {
     this.disposeResources();
     this.imageLoaded = false;
+  }
+
+  /**
+   * 分析当前加载的图像
+   * @returns 图像分析结果
+   */
+  analyze(): ImageAnalysis {
+    if (!this.imageLoaded) {
+      throw new Error('No image loaded');
+    }
+
+    // 先重置设置以获取原始图像数据
+    const currentSettings = { ...this.settings };
+    this.settings = { ...defaultSettings };
+    this.render();
+
+    const imageData = this.getImageData();
+    const analysis = analyzeImage(imageData);
+
+    // 恢复设置
+    this.settings = currentSettings;
+    this.render();
+
+    return analysis;
+  }
+
+  /**
+   * 自动修复图像
+   * 分析图像并自动调整色阶和鲜艳度
+   * @returns 应用的设置
+   */
+  autoFix(): ColorGradingSettings {
+    if (!this.imageLoaded) {
+      throw new Error('No image loaded');
+    }
+
+    // 先重置设置以获取原始图像数据
+    this.settings = { ...defaultSettings };
+    this.render();
+
+    const imageData = this.getImageData();
+    const levels = analyzeImageLevels(imageData);
+    const vibrance = analyzeImageVibrance(imageData);
+
+    const newSettings: ColorGradingSettings = { ...defaultSettings };
+
+    // 根据分析结果调整黑白色阶
+    newSettings.whites = Math.round(255 - levels.white);
+    newSettings.blacks = Math.round(levels.black);
+
+    // 如果图像不够鲜艳，增加自然饱和度
+    if (vibrance < 0.7) {
+      const vibranceBoost = Math.round((0.7 - vibrance) * 100);
+      newSettings.vibrance = Math.min(vibranceBoost, 50);
+    }
+
+    this.settings = newSettings;
+    this.render();
+
+    return newSettings;
+  }
+
+  /**
+   * 应用预设滤镜
+   * @param preset - 预设类型
+   * @returns 应用的设置
+   */
+  applyPreset(preset: PresetType): ColorGradingSettings {
+    if (preset === 'auto') {
+      return this.autoFix();
+    }
+
+    const presetSettings = presets[preset];
+    const newSettings: ColorGradingSettings = {
+      ...defaultSettings,
+      ...presetSettings,
+    };
+
+    this.settings = newSettings;
+    if (this.resources) {
+      this.render();
+    }
+
+    return newSettings;
   }
 
   // ===== 私有方法 =====

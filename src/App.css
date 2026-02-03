@@ -226,6 +226,9 @@
   }
  }
  .reset-button{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   padding-left: 12px;
   padding-top: 20px;
  }
