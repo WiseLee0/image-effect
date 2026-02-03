@@ -4,6 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "types": ["@webgpu/types"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

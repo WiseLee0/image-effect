@@ -1,4 +1,19 @@
 /**
+ * 后端类型
+ */
+export type BackendType = 'webgl' | 'webgpu';
+
+/**
+ * 处理器配置选项
+ */
+export interface ProcessorOptions {
+  /** canvas 元素 */
+  canvas?: HTMLCanvasElement;
+  /** 后端选择：'auto' | 'webgpu' | 'webgl' */
+  backend?: 'auto' | BackendType;
+}
+
+/**
  * 调色设置参数
  */
 export interface ColorGradingSettings {

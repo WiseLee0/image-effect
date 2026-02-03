@@ -1,4 +1,8 @@
-import type { ProgramInfo, RenderTarget } from './types';
+/**
+ * WebGL 工具函数
+ */
+
+import type { WebGLProgramInfo, WebGLRenderTarget } from './types';
 
 /**
  * 创建 WebGL 着色器
@@ -53,7 +57,7 @@ export function buildProgram(
   vertex: string,
   fragment: string,
   uniforms: string[]
-): ProgramInfo {
+): WebGLProgramInfo {
   const vs = createShader(gl, gl.VERTEX_SHADER, vertex);
   const fs = createShader(gl, gl.FRAGMENT_SHADER, fragment);
   if (!vs || !fs) {
@@ -83,7 +87,7 @@ export function createRenderTarget(
   gl: WebGLRenderingContext,
   width: number,
   height: number
-): RenderTarget {
+): WebGLRenderTarget {
   const texture = gl.createTexture();
   if (!texture) {
     throw new Error('Unable to create texture');

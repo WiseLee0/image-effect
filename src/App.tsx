@@ -5,6 +5,7 @@ import {
   ImageColorGrading,
   defaultSettings,
   type ColorGradingSettings,
+  type BackendType,
 } from "image-color-grading";
 
 const App = () => {
@@ -14,6 +15,7 @@ const App = () => {
   const objectUrlRef = useRef<string | null>(null);
   const [imageSrc, setImageSrc] = useState(imageUrl);
   const [settings, setSettings] = useState<ColorGradingSettings>(defaultSettings);
+  const [backendType, setBackendType] = useState<BackendType | null>(null);
 
   // 初始化处理器
   useEffect(() => {
@@ -37,7 +39,10 @@ const App = () => {
     const processor = processorRef.current;
     if (!processor) return;
 
-    processor.loadImage(imageSrc).catch((err) => {
+    processor.loadImage(imageSrc).then(() => {
+      // 图像加载后获取后端类型
+      setBackendType(processor.getBackendType());
+    }).catch((err) => {
       console.error("Failed to load image:", err);
     });
   }, [imageSrc]);
@@ -358,6 +363,11 @@ const App = () => {
 
       <div className="stage">
         <div className="stage__frame" ref={containerRef} />
+        {backendType && (
+          <div className="stage__backend">
+            渲染后端: <span className="stage__backend-type">{backendType.toUpperCase()}</span>
+          </div>
+        )}
         <div className="stage__actions">
           <input
             ref={fileInputRef}

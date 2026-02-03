@@ -1,10 +1,11 @@
 # image-color-grading
 
-基于 WebGL 的高性能图像调色库，支持 22+ 种专业级调色参数，可用于图像编辑、滤镜应用等场景。
+基于 WebGL/WebGPU 的高性能图像调色库，支持 22+ 种专业级调色参数，可用于图像编辑、滤镜应用等场景。
 
 ## 特性
 
-- 🚀 **高性能** - 基于 WebGL 的 GPU 加速渲染
+- 🚀 **高性能** - 基于 WebGL/WebGPU 的 GPU 加速渲染
+- 🔄 **双后端支持** - 支持 WebGPU（更高性能）和 WebGL（更广兼容性），自动降级
 - 🎨 **丰富的调色参数** - 支持 22+ 种专业调色参数
 - 📦 **零依赖** - 无任何第三方依赖
 - 🔧 **易于使用** - 简洁的 API 设计
@@ -30,8 +31,12 @@ pnpm add image-color-grading
 ```typescript
 import { ImageColorGrading } from 'image-color-grading';
 
-// 创建处理器实例
+// 创建处理器实例（自动选择最佳后端，优先 WebGPU）
 const processor = new ImageColorGrading();
+
+// 或指定后端
+const gpuProcessor = new ImageColorGrading({ backend: 'webgpu' });
+const glProcessor = new ImageColorGrading({ backend: 'webgl' });
 
 // 加载图像
 await processor.loadImage('path/to/image.jpg');
@@ -43,6 +48,9 @@ processor.setSettings({
   saturation: 15,
   vibrance: 25,
 });
+
+// 检查当前使用的后端
+console.log(processor.getBackendType()); // 'webgl' | 'webgpu'
 
 // 导出为 Data URL
 const dataUrl = processor.toDataURL();
@@ -80,10 +88,22 @@ processor.applyPreset('auto');     // 自动优化（等同于 autoFix）
 #### 构造函数
 
 ```typescript
-const processor = new ImageColorGrading(canvas?: HTMLCanvasElement);
+const processor = new ImageColorGrading(options?: ProcessorOptions);
 ```
 
-- `canvas` - 可选，自定义 canvas 元素。不传则自动创建。
+**ProcessorOptions:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `canvas` | `HTMLCanvasElement` | - | 自定义 canvas 元素 |
+| `backend` | `'auto' \| 'webgpu' \| 'webgl'` | `'auto'` | 后端选择，auto 优先使用 WebGPU |
+
+```typescript
+// 示例
+const processor = new ImageColorGrading({
+  backend: 'webgpu',
+});
+```
 
 #### 方法
 

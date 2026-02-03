@@ -1,5 +1,5 @@
 /**
- * WebGL 着色器代码
+ * WebGL GLSL 着色器代码
  */
 
 export const vertexSource = `
