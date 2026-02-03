@@ -8,31 +8,38 @@ import {
   type BackendType,
 } from "image-color-grading";
 
+type BackendChoice = "auto" | BackendType;
+
 const App = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const processorRef = useRef<ImageColorGrading | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const settingsRef = useRef<ColorGradingSettings>(defaultSettings);
   const [imageSrc, setImageSrc] = useState(imageUrl);
   const [settings, setSettings] = useState<ColorGradingSettings>(defaultSettings);
   const [backendType, setBackendType] = useState<BackendType | null>(null);
+  const [backendChoice, setBackendChoice] = useState<BackendChoice>("auto");
+  const isWebGPUSupported = ImageColorGrading.isWebGPUSupported();
+  const isWebGLSupported = ImageColorGrading.isWebGLSupported();
 
   // 初始化处理器
   useEffect(() => {
-    const processor = new ImageColorGrading();
+    const processor = new ImageColorGrading({ backend: backendChoice });
     processorRef.current = processor;
 
     // 将 canvas 添加到 DOM
     if (containerRef.current) {
       const canvas = processor.getCanvas();
       canvas.className = "stage__canvas";
-      containerRef.current.appendChild(canvas);
+      containerRef.current.replaceChildren(canvas);
     }
+    setBackendType(null);
 
     return () => {
       processor.dispose();
     };
-  }, []);
+  }, [backendChoice]);
 
   // 加载图像
   useEffect(() => {
@@ -42,13 +49,15 @@ const App = () => {
     processor.loadImage(imageSrc).then(() => {
       // 图像加载后获取后端类型
       setBackendType(processor.getBackendType());
+      processor.setSettings(settingsRef.current);
     }).catch((err: Error) => {
       console.error("Failed to load image:", err);
     });
-  }, [imageSrc]);
+  }, [imageSrc, backendChoice]);
 
   // 更新设置
   useEffect(() => {
+    settingsRef.current = settings;
     const processor = processorRef.current;
     if (!processor || !processor.isLoaded()) return;
 
@@ -151,52 +160,73 @@ const App = () => {
     setSettings(newSettings);
   }, []);
 
+  const handleBackendChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setBackendChoice(event.target.value as BackendChoice);
+  };
+
   return (
     <div className="page">
       <div className="panel">
         <div className="reset-button">
-          <button
-            className="panel__reset"
-            onClick={handleAutoFix}
-          >
-            自动
-          </button>
-          <button
-            className="panel__reset"
-            onClick={handleBlackWhite}
-          >
-            黑白风格
-          </button>
-          <button
-            className="panel__reset"
-            onClick={handlePop}
-          >
-            流行风格
-          </button>
-          <button
-            className="panel__reset"
-            onClick={handleVintage}
-          >
-            复古风格
-          </button>
-          <button
-            className="panel__reset"
-            onClick={handleVivid}
-          >
-            鲜艳风格
-          </button>
-          <button
-            className="panel__reset"
-            onClick={handleCinematic}
-          >
-            电影风格
-          </button>
-          <button
-            className="panel__reset"
-            onClick={() => setSettings(defaultSettings)}
-          >
-            重置
-          </button>
+          <div className="reset-button__row">
+            <button
+              className="panel__reset"
+              onClick={handleAutoFix}
+            >
+              自动
+            </button>
+            <button
+              className="panel__reset"
+              onClick={handleBlackWhite}
+            >
+              黑白风格
+            </button>
+            <button
+              className="panel__reset"
+              onClick={handlePop}
+            >
+              流行风格
+            </button>
+            <button
+              className="panel__reset"
+              onClick={handleVintage}
+            >
+              复古风格
+            </button>
+            <button
+              className="panel__reset"
+              onClick={handleVivid}
+            >
+              鲜艳风格
+            </button>
+            <button
+              className="panel__reset"
+              onClick={handleCinematic}
+            >
+              电影风格
+            </button>
+          </div>
+          <div className="reset-button__divider" />
+          <div className="reset-button__row reset-button__row--secondary">
+            <button
+              className="panel__reset"
+              onClick={() => setSettings(defaultSettings)}
+            >
+              重置
+            </button>
+            <label className="reset-button__backend">
+              <span>切换后端</span>
+              <select
+                className="reset-button__select"
+                value={backendChoice}
+                onChange={handleBackendChange}
+              >
+                <option value="auto">自动</option>
+                <option value="webgl" disabled={!isWebGLSupported}>WebGL</option>
+                <option value="webgpu" disabled={!isWebGPUSupported}>WebGPU</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div className="panel__content">
           <div className="panel__group">
