@@ -42,7 +42,7 @@ const App = () => {
     processor.loadImage(imageSrc).then(() => {
       // 图像加载后获取后端类型
       setBackendType(processor.getBackendType());
-    }).catch((err) => {
+    }).catch((err: Error) => {
       console.error("Failed to load image:", err);
     });
   }, [imageSrc]);
@@ -69,7 +69,7 @@ const App = () => {
     (key: keyof ColorGradingSettings) =>
       (event: ChangeEvent<HTMLInputElement>) => {
         const value = Number(event.target.value);
-        setSettings((prev) => ({ ...prev, [key]: value }));
+        setSettings((prev: ColorGradingSettings) => ({ ...prev, [key]: value }));
       };
 
   const handleReplaceImage = (event: ChangeEvent<HTMLInputElement>) => {
