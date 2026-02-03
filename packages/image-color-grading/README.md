@@ -51,6 +51,26 @@ const dataUrl = processor.toDataURL();
 const blob = await processor.toBlob({ format: 'image/jpeg', quality: 0.9 });
 ```
 
+### 使用自动修复
+
+```typescript
+// 自动分析图像并优化
+const settings = processor.autoFix();
+console.log(settings); // 返回应用的设置参数
+```
+
+### 使用预设滤镜
+
+```typescript
+// 应用预设滤镜
+processor.applyPreset('pop');      // 流行风格
+processor.applyPreset('vintage');  // 复古风格
+processor.applyPreset('cinematic'); // 电影风格
+processor.applyPreset('blackAndWhite'); // 黑白
+processor.applyPreset('vivid');    // 鲜艳
+processor.applyPreset('auto');     // 自动优化（等同于 autoFix）
+```
+
 ## API 文档
 
 ### ImageColorGrading
@@ -216,6 +236,86 @@ if (processor.isLoaded()) {
 processor.dispose();
 ```
 
+##### autoFix(): ColorGradingSettings
+
+自动分析图像并优化。会根据图像的色阶分布和鲜艳度自动调整参数。
+
+```typescript
+const settings = processor.autoFix();
+// settings 包含自动计算的 whites、blacks、vibrance 等参数
+```
+
+**工作原理：**
+1. 分析图像的直方图，找出有效的黑白色阶范围
+2. 根据色阶范围自动调整 `whites` 和 `blacks` 参数
+3. 分析图像的平均鲜艳度，如果不够鲜艳则自动增加 `vibrance`
+
+##### applyPreset(preset: PresetType): ColorGradingSettings
+
+应用预设滤镜效果。
+
+```typescript
+// 应用流行风格
+const settings = processor.applyPreset('pop');
+
+// 应用黑白效果
+processor.applyPreset('blackAndWhite');
+```
+
+**可用预设：**
+
+| 预设名 | 说明 | 主要参数 |
+|--------|------|----------|
+| `auto` | 自动优化 | 根据图像分析自动调整 |
+| `blackAndWhite` | 黑白 | 去色 + 对比度增强 |
+| `pop` | 流行 | 高对比 + 高饱和 |
+| `vintage` | 复古 | 褪色 + 暖色调 + 颗粒 |
+| `vivid` | 鲜艳 | 高饱和 + 高清晰度 |
+| `cinematic` | 电影 | 高对比 + 冷色调 + 暗角 |
+
+### 图像分析函数
+
+库还导出了独立的图像分析函数，可用于自定义分析逻辑。
+
+##### analyzeImageLevels(imageData: ImageData): ImageLevels
+
+分析图像的色阶分布。
+
+```typescript
+import { analyzeImageLevels } from 'image-color-grading';
+
+const canvas = document.querySelector('canvas');
+const ctx = canvas.getContext('2d');
+const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+const levels = analyzeImageLevels(imageData);
+console.log(levels.black); // 最暗有效像素值 (0-100)
+console.log(levels.white); // 最亮有效像素值 (155-255)
+```
+
+##### analyzeImageVibrance(imageData: ImageData): number
+
+分析图像的鲜艳度。
+
+```typescript
+import { analyzeImageVibrance } from 'image-color-grading';
+
+const vibrance = analyzeImageVibrance(imageData);
+console.log(vibrance); // 0-1 之间，值越高越鲜艳
+```
+
+##### analyzeImage(imageData: ImageData): ImageAnalysis
+
+综合分析图像（包含色阶和鲜艳度）。
+
+```typescript
+import { analyzeImage } from 'image-color-grading';
+
+const analysis = analyzeImage(imageData);
+console.log(analysis.levels); // { black, white }
+console.log(analysis.vibrance); // 0-1
+```
+
 ### 调色参数
 
 所有参数的默认值为 `0`。
@@ -279,6 +379,21 @@ type PartialColorGradingSettings = Partial<ColorGradingSettings>;
 interface ExportOptions {
   format?: 'image/png' | 'image/jpeg' | 'image/webp';
   quality?: number; // 0-1, 仅对 jpeg/webp 有效
+}
+
+// 预设滤镜类型
+type PresetType = 'auto' | 'blackAndWhite' | 'pop' | 'vintage' | 'vivid' | 'cinematic';
+
+// 图像色阶分析结果
+interface ImageLevels {
+  black: number; // 最暗有效像素值 (0-100)
+  white: number; // 最亮有效像素值 (155-255)
+}
+
+// 图像分析结果
+interface ImageAnalysis {
+  levels: ImageLevels;
+  vibrance: number; // 0-1
 }
 ```
 
@@ -392,43 +507,49 @@ async function batchProcess(imageUrls: string[], settings: Partial<ColorGradingS
 }
 ```
 
-### 创建预设滤镜
+### 使用内置预设滤镜
 
 ```typescript
-import { ImageColorGrading, PartialColorGradingSettings } from 'image-color-grading';
+import { ImageColorGrading, presets } from 'image-color-grading';
 
-// 定义预设滤镜
-const presets: Record<string, PartialColorGradingSettings> = {
-  vintage: {
-    saturation: -20,
-    contrast: 10,
-    temperature: 15,
-    grain: 30,
-    vignette: 25,
-  },
-  blackAndWhite: {
-    saturation: -100,
-    contrast: 20,
-  },
-  vivid: {
-    vibrance: 40,
-    saturation: 20,
-    contrast: 15,
-    clarity: 20,
-  },
-  cinematic: {
-    contrast: 25,
-    highlights: -20,
-    shadows: 15,
-    temperature: -10,
-    vignette: 30,
-  },
-};
+const processor = new ImageColorGrading();
+await processor.loadImage('/sample.jpg');
 
-// 应用预设
-function applyPreset(processor: ImageColorGrading, presetName: string) {
-  processor.resetSettings();
-  processor.setSettings(presets[presetName]);
+// 方式1：使用 applyPreset 方法
+processor.applyPreset('pop');
+
+// 方式2：直接使用 presets 配置
+console.log(presets.pop);
+// { highlights: 50, shadows: -50, vibrance: 50, saturation: 20, exposure: 20, clarity: 20 }
+
+// 自定义预设（基于内置预设扩展）
+processor.setSettings({
+  ...presets.vintage,
+  grain: 50, // 增加颗粒感
+});
+```
+
+### 自动修复示例
+
+```typescript
+import { ImageColorGrading, analyzeImage } from 'image-color-grading';
+
+const processor = new ImageColorGrading();
+await processor.loadImage('/photo.jpg');
+
+// 方式1：一键自动修复
+processor.autoFix();
+
+// 方式2：手动分析并自定义调整
+const imageData = processor.getImageData();
+const analysis = analyzeImage(imageData);
+
+if (analysis.vibrance < 0.5) {
+  // 图像非常暗淡，需要更强的增强
+  processor.setSettings({
+    vibrance: 60,
+    saturation: 30,
+  });
 }
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "image-color-grading",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "基于 WebGL 的高性能图像调色库，支持亮度、对比度、饱和度、色温等 22+ 种调色参数",
   "type": "module",
   "main": "./dist/index.cjs",
