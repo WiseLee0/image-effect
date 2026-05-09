@@ -8,6 +8,8 @@
 export interface WebGPUPipelineInfo {
   pipeline: GPURenderPipeline;
   bindGroupLayout: GPUBindGroupLayout;
+  hasUniform: boolean;
+  hasExtraTexture: boolean;
 }
 
 /**
@@ -35,4 +37,8 @@ export interface WebGPUResources {
   targets: [WebGPURenderTarget, WebGPURenderTarget];
   paletteTexture: GPUTexture | null;
   paletteTextureView: GPUTextureView | null;
+  /** Persistent uniform buffer per pipeline; reused every frame via writeBuffer. */
+  uniformBuffers: Record<string, GPUBuffer>;
+  /** bindGroup cache keyed by pipeline name then input texture view. */
+  bindGroupCache: Map<string, Map<GPUTextureView, GPUBindGroup>>;
 }

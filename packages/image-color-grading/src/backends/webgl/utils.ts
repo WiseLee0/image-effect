@@ -10,7 +10,7 @@ import type { WebGLProgramInfo, WebGLRenderTarget } from './types';
 export function createShader(
   gl: WebGLRenderingContext,
   type: GLenum,
-  source: string
+  source: string,
 ): WebGLShader | null {
   const shader = gl.createShader(type);
   if (!shader) return null;
@@ -32,7 +32,7 @@ export function createShader(
 export function createProgram(
   gl: WebGLRenderingContext,
   vs: WebGLShader,
-  fs: WebGLShader
+  fs: WebGLShader,
 ): WebGLProgram | null {
   const program = gl.createProgram();
   if (!program) return null;
@@ -56,7 +56,7 @@ export function buildProgram(
   gl: WebGLRenderingContext,
   vertex: string,
   fragment: string,
-  uniforms: string[]
+  uniforms: string[],
 ): WebGLProgramInfo {
   const vs = createShader(gl, gl.VERTEX_SHADER, vertex);
   const fs = createShader(gl, gl.FRAGMENT_SHADER, fragment);
@@ -86,24 +86,14 @@ export function buildProgram(
 export function createRenderTarget(
   gl: WebGLRenderingContext,
   width: number,
-  height: number
+  height: number,
 ): WebGLRenderTarget {
   const texture = gl.createTexture();
   if (!texture) {
     throw new Error('Unable to create texture');
   }
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.RGBA,
-    width,
-    height,
-    0,
-    gl.RGBA,
-    gl.UNSIGNED_BYTE,
-    null
-  );
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -114,13 +104,7 @@ export function createRenderTarget(
     throw new Error('Unable to create framebuffer');
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-  gl.framebufferTexture2D(
-    gl.FRAMEBUFFER,
-    gl.COLOR_ATTACHMENT0,
-    gl.TEXTURE_2D,
-    texture,
-    0
-  );
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
 
   return { framebuffer, texture };
 }
@@ -137,12 +121,7 @@ export const clamp01 = (value: number): number => Math.min(1, Math.max(0, value)
  */
 export const cubicBezier = (t: number, p0: number, p1: number, p2: number, p3: number): number => {
   const u = 1 - t;
-  return (
-    u * u * u * p0 +
-    3 * u * u * t * p1 +
-    3 * u * t * t * p2 +
-    t * t * t * p3
-  );
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
 };
 
 /**
@@ -182,17 +161,7 @@ export const createPaletteTexture = (gl: WebGLRenderingContext, data: Uint8Array
     throw new Error('Unable to create palette texture');
   }
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.RGB,
-    PALETTE_SIZE,
-    1,
-    0,
-    gl.RGB,
-    gl.UNSIGNED_BYTE,
-    data
-  );
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, PALETTE_SIZE, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, data);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -206,20 +175,10 @@ export const createPaletteTexture = (gl: WebGLRenderingContext, data: Uint8Array
 export const updatePaletteTexture = (
   gl: WebGLRenderingContext,
   texture: WebGLTexture,
-  data: Uint8Array
+  data: Uint8Array,
 ): void => {
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texSubImage2D(
-    gl.TEXTURE_2D,
-    0,
-    0,
-    0,
-    PALETTE_SIZE,
-    1,
-    gl.RGB,
-    gl.UNSIGNED_BYTE,
-    data
-  );
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, PALETTE_SIZE, 1, gl.RGB, gl.UNSIGNED_BYTE, data);
 };
 
 /**
@@ -230,10 +189,26 @@ export const buildContrastMatrix = (amount: number): Float32Array => {
   const scale = 1 + t;
   const offset = 0.5 * (1 - scale);
   return new Float32Array([
-    scale, 0, 0, 0, offset,
-    0, scale, 0, 0, offset,
-    0, 0, scale, 0, offset,
-    0, 0, 0, 1, 0,
+    scale,
+    0,
+    0,
+    0,
+    offset,
+    0,
+    scale,
+    0,
+    0,
+    offset,
+    0,
+    0,
+    scale,
+    0,
+    offset,
+    0,
+    0,
+    0,
+    1,
+    0,
   ]);
 };
 
@@ -248,9 +223,25 @@ export const buildSaturationMatrix = (amount: number): Float32Array => {
   const lumB = 0.114;
   const inv = 1 - scale;
   return new Float32Array([
-    inv * lumR + scale, inv * lumG, inv * lumB, 0, 0,
-    inv * lumR, inv * lumG + scale, inv * lumB, 0, 0,
-    inv * lumR, inv * lumG, inv * lumB + scale, 0, 0,
-    0, 0, 0, 1, 0,
+    inv * lumR + scale,
+    inv * lumG,
+    inv * lumB,
+    0,
+    0,
+    inv * lumR,
+    inv * lumG + scale,
+    inv * lumB,
+    0,
+    0,
+    inv * lumR,
+    inv * lumG,
+    inv * lumB + scale,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
   ]);
 };

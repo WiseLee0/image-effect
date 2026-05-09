@@ -13,9 +13,7 @@ export type BackendType = 'webgl' | 'webgpu';
 /**
  * 后端初始化选项
  */
-export interface BackendOptions {
-  // 预留扩展
-}
+export type BackendOptions = Record<string, unknown>;
 
 /**
  * 后端抽象基类
@@ -103,9 +101,7 @@ export function isWebGLSupported(): boolean {
   if (typeof document === 'undefined') return false;
   try {
     const canvas = document.createElement('canvas');
-    return !!(
-      canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
-    );
+    return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
   } catch {
     return false;
   }
@@ -114,9 +110,7 @@ export function isWebGLSupported(): boolean {
 /**
  * 自动选择最佳后端
  */
-export function selectBestBackend(
-  preferred?: 'auto' | BackendType
-): BackendType {
+export function selectBestBackend(preferred?: 'auto' | BackendType): BackendType {
   if (preferred === 'webgpu' && isWebGPUSupported()) {
     return 'webgpu';
   }

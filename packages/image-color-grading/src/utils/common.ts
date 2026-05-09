@@ -12,12 +12,7 @@ export const clamp01 = (value: number): number => Math.min(1, Math.max(0, value)
  */
 export const cubicBezier = (t: number, p0: number, p1: number, p2: number, p3: number): number => {
   const u = 1 - t;
-  return (
-    u * u * u * p0 +
-    3 * u * u * t * p1 +
-    3 * u * t * t * p2 +
-    t * t * t * p3
-  );
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
 };
 
 const PALETTE_SIZE = 256;
@@ -58,10 +53,26 @@ export const buildContrastMatrix = (amount: number): Float32Array => {
   const scale = 1 + t;
   const offset = 0.5 * (1 - scale);
   return new Float32Array([
-    scale, 0, 0, 0, offset,
-    0, scale, 0, 0, offset,
-    0, 0, scale, 0, offset,
-    0, 0, 0, 1, 0,
+    scale,
+    0,
+    0,
+    0,
+    offset,
+    0,
+    scale,
+    0,
+    0,
+    offset,
+    0,
+    0,
+    scale,
+    0,
+    offset,
+    0,
+    0,
+    0,
+    1,
+    0,
   ]);
 };
 
@@ -76,9 +87,25 @@ export const buildSaturationMatrix = (amount: number): Float32Array => {
   const lumB = 0.114;
   const inv = 1 - scale;
   return new Float32Array([
-    inv * lumR + scale, inv * lumG, inv * lumB, 0, 0,
-    inv * lumR, inv * lumG + scale, inv * lumB, 0, 0,
-    inv * lumR, inv * lumG, inv * lumB + scale, 0, 0,
-    0, 0, 0, 1, 0,
+    inv * lumR + scale,
+    inv * lumG,
+    inv * lumB,
+    0,
+    0,
+    inv * lumR,
+    inv * lumG + scale,
+    inv * lumB,
+    0,
+    0,
+    inv * lumR,
+    inv * lumG,
+    inv * lumB + scale,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
   ]);
 };

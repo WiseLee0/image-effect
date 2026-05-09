@@ -649,7 +649,8 @@ struct Params {
   texelY: f32,
   amount: f32,
   _pad: f32,
-  kernel: array<f32, 12>, // 9 + 3 padding
+  // uniform 数组要求 16 字节 stride，用 3 个 vec4 装 9 个 kernel 值（最后 3 个分量是 padding）
+  kernel: array<vec4<f32>, 3>,
 }
 
 @group(0) @binding(0) var uTexture: texture_2d<f32>;
@@ -659,7 +660,7 @@ struct Params {
 @fragment
 fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let texel = vec2<f32>(params.texelX, params.texelY);
-  
+
   let c11 = textureSample(uTexture, uSampler, uv - texel);
   let c12 = textureSample(uTexture, uSampler, vec2<f32>(uv.x, uv.y - texel.y));
   let c13 = textureSample(uTexture, uSampler, vec2<f32>(uv.x + texel.x, uv.y - texel.y));
@@ -669,11 +670,11 @@ fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let c31 = textureSample(uTexture, uSampler, vec2<f32>(uv.x - texel.x, uv.y + texel.y));
   let c32 = textureSample(uTexture, uSampler, vec2<f32>(uv.x, uv.y + texel.y));
   let c33 = textureSample(uTexture, uSampler, uv + texel);
-  
-  let color = c11 * params.kernel[0] + c12 * params.kernel[1] + c13 * params.kernel[2] +
-              c21 * params.kernel[3] + c22 * params.kernel[4] + c23 * params.kernel[5] +
-              c31 * params.kernel[6] + c32 * params.kernel[7] + c33 * params.kernel[8];
-  
+
+  let color = c11 * params.kernel[0].x + c12 * params.kernel[0].y + c13 * params.kernel[0].z +
+              c21 * params.kernel[0].w + c22 * params.kernel[1].x + c23 * params.kernel[1].y +
+              c31 * params.kernel[1].z + c32 * params.kernel[1].w + c33 * params.kernel[2].x;
+
   return color * params.amount + (c22 * (1.0 - params.amount));
 }
 `;

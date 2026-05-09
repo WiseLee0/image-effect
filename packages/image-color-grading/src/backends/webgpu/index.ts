@@ -2,11 +2,11 @@
  * WebGPU 后端实现
  */
 
-import { BaseBackend, type BackendType, type BackendOptions } from '../base';
 import type { ColorGradingSettings } from '../../types';
-import type { WebGPUPipelineInfo, WebGPURenderTarget, WebGPUResources } from './types';
+import { buildBlackPalette, buildContrastMatrix, buildSaturationMatrix } from '../../utils/common';
+import { type BackendOptions, type BackendType, BaseBackend } from '../base';
 import * as shaders from './shaders';
-import { buildContrastMatrix, buildSaturationMatrix, buildBlackPalette } from '../../utils/common';
+import type { WebGPUPipelineInfo, WebGPURenderTarget, WebGPUResources } from './types';
 
 export class WebGPUBackend extends BaseBackend {
   private device: GPUDevice | null = null;
@@ -87,12 +87,12 @@ export class WebGPUBackend extends BaseBackend {
     if (!ctx) {
       throw new Error('Cannot create 2D context');
     }
-    
+
     const { width, height } = this.resources;
     ctx.canvas.width = width;
     ctx.canvas.height = height;
     ctx.drawImage(this.canvas, 0, 0);
-    
+
     return ctx.getImageData(0, 0, width, height);
   }
 
@@ -105,28 +105,28 @@ export class WebGPUBackend extends BaseBackend {
     }
 
     const { device, width, height, targets } = this.resources;
-    
-    const bytesPerRow = Math.ceil(width * 4 / 256) * 256;
+
+    const bytesPerRow = Math.ceil((width * 4) / 256) * 256;
     const bufferSize = bytesPerRow * height;
-    
+
     const readBuffer = device.createBuffer({
       size: bufferSize,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     });
 
     const commandEncoder = device.createCommandEncoder();
-    
+
     commandEncoder.copyTextureToBuffer(
       { texture: targets[0].texture },
       { buffer: readBuffer, bytesPerRow },
-      { width, height }
+      { width, height },
     );
-    
+
     device.queue.submit([commandEncoder.finish()]);
 
     await readBuffer.mapAsync(GPUMapMode.READ);
     const data = new Uint8Array(readBuffer.getMappedRange());
-    
+
     // 处理行对齐
     const pixels = new Uint8ClampedArray(width * height * 4);
     for (let y = 0; y < height; y++) {
@@ -134,7 +134,7 @@ export class WebGPUBackend extends BaseBackend {
       const dstOffset = y * width * 4;
       pixels.set(data.subarray(srcOffset, srcOffset + width * 4), dstOffset);
     }
-    
+
     readBuffer.unmap();
     readBuffer.destroy();
 
@@ -143,6 +143,13 @@ export class WebGPUBackend extends BaseBackend {
 
   dispose(): void {
     this.disposeResources();
+    // device.destroy() releases all GPU-side resources backed by this device:
+    // pipelines, shader modules, samplers, bind group layouts. Texture/buffer
+    // objects in `resources` are explicitly destroyed in disposeResources()
+    // for early reclamation under memory pressure; everything else is freed
+    // here. Without this call, opening/closing the color-adjust dialog
+    // accumulates GPU device handles across the session.
+    this.device?.destroy();
     this.device = null;
     this.initialized = false;
   }
@@ -158,7 +165,7 @@ export class WebGPUBackend extends BaseBackend {
     format: GPUTextureFormat,
     fragmentShader: string,
     hasParams: boolean = true,
-    hasExtraTexture: boolean = false
+    hasExtraTexture: boolean = false,
   ): WebGPUPipelineInfo {
     const entries: GPUBindGroupLayoutEntry[] = [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
@@ -176,7 +183,7 @@ export class WebGPUBackend extends BaseBackend {
     if (hasExtraTexture) {
       entries.push(
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } }
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       );
     }
 
@@ -199,13 +206,15 @@ export class WebGPUBackend extends BaseBackend {
       vertex: {
         module: vertexModule,
         entryPoint: 'main',
-        buffers: [{
-          arrayStride: 16,
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: 'float32x2' },
-            { shaderLocation: 1, offset: 8, format: 'float32x2' },
-          ],
-        }],
+        buffers: [
+          {
+            arrayStride: 16,
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: 'float32x2' },
+              { shaderLocation: 1, offset: 8, format: 'float32x2' },
+            ],
+          },
+        ],
       },
       fragment: {
         module: fragmentModule,
@@ -217,14 +226,22 @@ export class WebGPUBackend extends BaseBackend {
       },
     });
 
-    return { pipeline, bindGroupLayout };
+    return { pipeline, bindGroupLayout, hasUniform: hasParams, hasExtraTexture };
   }
 
-  private createRenderTarget(device: GPUDevice, width: number, height: number, format: GPUTextureFormat): WebGPURenderTarget {
+  private createRenderTarget(
+    device: GPUDevice,
+    width: number,
+    height: number,
+    format: GPUTextureFormat,
+  ): WebGPURenderTarget {
     const texture = device.createTexture({
       size: { width, height },
       format,
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.COPY_SRC,
     });
     return {
       texture,
@@ -232,7 +249,12 @@ export class WebGPUBackend extends BaseBackend {
     };
   }
 
-  private initResources(device: GPUDevice, width: number, height: number, image: HTMLImageElement): void {
+  private initResources(
+    device: GPUDevice,
+    width: number,
+    height: number,
+    image: HTMLImageElement,
+  ): void {
     const context = this.canvas.getContext('webgpu');
     if (!context) {
       throw new Error('Failed to get WebGPU context');
@@ -245,28 +267,37 @@ export class WebGPUBackend extends BaseBackend {
     const sourceTexture = device.createTexture({
       size: { width, height },
       format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
     // 使用 canvas 获取图像数据
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
     tempCanvas.height = height;
-    const tempCtx = tempCanvas.getContext('2d')!;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) throw new Error('Failed to get 2d context');
     tempCtx.drawImage(image, 0, 0);
     const imageData = tempCtx.getImageData(0, 0, width, height);
-    
+
     device.queue.writeTexture(
       { texture: sourceTexture },
       imageData.data,
       { bytesPerRow: width * 4 },
-      { width, height }
+      { width, height },
     );
 
     this.setupResources(device, context, format, width, height, sourceTexture);
   }
 
-  private initResourcesFromImageData(device: GPUDevice, width: number, height: number, imageData: ImageData): void {
+  private initResourcesFromImageData(
+    device: GPUDevice,
+    width: number,
+    height: number,
+    imageData: ImageData,
+  ): void {
     const context = this.canvas.getContext('webgpu');
     if (!context) {
       throw new Error('Failed to get WebGPU context');
@@ -278,14 +309,17 @@ export class WebGPUBackend extends BaseBackend {
     const sourceTexture = device.createTexture({
       size: { width, height },
       format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
     device.queue.writeTexture(
       { texture: sourceTexture },
       imageData.data,
       { bytesPerRow: width * 4 },
-      { width, height }
+      { width, height },
     );
 
     this.setupResources(device, context, format, width, height, sourceTexture);
@@ -297,7 +331,7 @@ export class WebGPUBackend extends BaseBackend {
     format: GPUTextureFormat,
     width: number,
     height: number,
-    sourceTexture: GPUTexture
+    sourceTexture: GPUTexture,
   ): void {
     // 创建采样器
     const sampler = device.createSampler({
@@ -309,10 +343,22 @@ export class WebGPUBackend extends BaseBackend {
 
     // 创建顶点缓冲区
     const vertices = new Float32Array([
-      -1, -1, 0, 1,  // position, uv (flip y)
-       1, -1, 1, 1,
-      -1,  1, 0, 0,
-       1,  1, 1, 0,
+      -1,
+      -1,
+      0,
+      1, // position, uv (flip y)
+      1,
+      -1,
+      1,
+      1,
+      -1,
+      1,
+      0,
+      0,
+      1,
+      1,
+      1,
+      0,
     ]);
     const vertexBuffer = device.createBuffer({
       size: vertices.byteLength,
@@ -322,7 +368,7 @@ export class WebGPUBackend extends BaseBackend {
 
     // 中间渲染使用 rgba8unorm 格式
     const intermediateFormat: GPUTextureFormat = 'rgba8unorm';
-    
+
     // 创建管线（中间渲染用 rgba8unorm，最终输出用 canvas 格式）
     const pipelines: Record<string, WebGPUPipelineInfo> = {
       // 最终输出到 canvas 的 pass 管线使用 canvas 格式
@@ -363,6 +409,22 @@ export class WebGPUBackend extends BaseBackend {
       this.createRenderTarget(device, width, height, 'rgba8unorm'),
     ];
 
+    // Pre-allocate one persistent uniform buffer per pipeline that needs it.
+    // Largest uniform payload is the kernel pass at 64 bytes; pad to 256 for
+    // alignment and headroom. Reused every frame via writeBuffer (avoids
+    // 21 createBuffer/destroy round-trips per render).
+    const uniformBuffers: Record<string, GPUBuffer> = {};
+    const bindGroupCache = new Map<string, Map<GPUTextureView, GPUBindGroup>>();
+    for (const [name, info] of Object.entries(pipelines)) {
+      bindGroupCache.set(name, new Map());
+      if (info.hasUniform) {
+        uniformBuffers[name] = device.createBuffer({
+          size: 256,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+      }
+    }
+
     this.resources = {
       device,
       context,
@@ -377,29 +439,35 @@ export class WebGPUBackend extends BaseBackend {
       targets,
       paletteTexture,
       paletteTextureView: paletteTexture.createView(),
+      uniformBuffers,
+      bindGroupCache,
     };
   }
 
   private disposeResources(): void {
     if (!this.resources) return;
 
-    const { sourceTexture, vertexBuffer, targets, paletteTexture } = this.resources;
-    
+    const { context, sourceTexture, vertexBuffer, targets, paletteTexture, uniformBuffers } =
+      this.resources;
+
     sourceTexture.destroy();
     vertexBuffer.destroy();
-    targets.forEach(t => t.texture.destroy());
+    for (const t of targets) {
+      t.texture.destroy();
+    }
     if (paletteTexture) paletteTexture.destroy();
+    for (const buf of Object.values(uniformBuffers)) {
+      buf.destroy();
+    }
+    // Detach the canvas from the device so the swap-chain stops holding a
+    // reference to the about-to-be-destroyed device.
+    try {
+      context.unconfigure();
+    } catch {
+      // unconfigure() is safe to skip if the context was already torn down.
+    }
 
     this.resources = null;
-  }
-
-  private createUniformBuffer(device: GPUDevice, data: ArrayBufferLike): GPUBuffer {
-    const buffer = device.createBuffer({
-      size: Math.max(data.byteLength, 16), // 最小 16 字节
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(buffer, 0, data as ArrayBuffer);
-    return buffer;
   }
 
   private drawFrame(resources: WebGPUResources, settings: ColorGradingSettings): void {
@@ -415,10 +483,14 @@ export class WebGPUBackend extends BaseBackend {
       targets,
       paletteTexture,
       paletteTextureView,
+      uniformBuffers,
+      bindGroupCache,
     } = resources;
 
     let inputTextureView = sourceTextureView;
     let pingIndex = 0;
+
+    const commandEncoder = device.createCommandEncoder();
 
     const swapTarget = (): WebGPURenderTarget => {
       const target = targets[pingIndex % 2];
@@ -426,41 +498,70 @@ export class WebGPUBackend extends BaseBackend {
       return target;
     };
 
-    const runPass = (
+    const getOrCreateBindGroup = (
       pipelineName: string,
-      uniformData?: ArrayBufferLike,
-      outputView?: GPUTextureView
-    ) => {
-      const pipelineInfo = pipelines[pipelineName];
-      if (!pipelineInfo) return;
-
-      const target = outputView ? null : swapTarget();
-      const targetView = outputView || target!.view;
+      pipelineInfo: WebGPUPipelineInfo,
+      inputView: GPUTextureView,
+    ): GPUBindGroup => {
+      const cache = bindGroupCache.get(pipelineName);
+      if (!cache) {
+        throw new Error(`No bindGroup cache for pipeline ${pipelineName}`);
+      }
+      const cached = cache.get(inputView);
+      if (cached) return cached;
 
       const entries: GPUBindGroupEntry[] = [
-        { binding: 0, resource: inputTextureView },
+        { binding: 0, resource: inputView },
         { binding: 1, resource: sampler },
       ];
-
-      let uniformBuffer: GPUBuffer | null = null;
-      if (uniformData) {
-        uniformBuffer = this.createUniformBuffer(device, uniformData);
-        entries.push({ binding: 2, resource: { buffer: uniformBuffer } });
+      if (pipelineInfo.hasUniform) {
+        entries.push({ binding: 2, resource: { buffer: uniformBuffers[pipelineName] } });
+      }
+      if (pipelineInfo.hasExtraTexture) {
+        if (!paletteTextureView) {
+          throw new Error('Pipeline requires palette texture but none allocated');
+        }
+        entries.push(
+          { binding: 2, resource: paletteTextureView },
+          { binding: 3, resource: sampler },
+        );
       }
 
       const bindGroup = device.createBindGroup({
         layout: pipelineInfo.bindGroupLayout,
         entries,
       });
+      cache.set(inputView, bindGroup);
+      return bindGroup;
+    };
 
-      const commandEncoder = device.createCommandEncoder();
+    const runPass = (
+      pipelineName: string,
+      uniformData?: ArrayBufferLike,
+      outputView?: GPUTextureView,
+    ) => {
+      const pipelineInfo = pipelines[pipelineName];
+      if (!pipelineInfo) return;
+
+      const target = outputView ? null : swapTarget();
+      const targetView = outputView || target?.view;
+      if (!targetView) return;
+
+      if (uniformData) {
+        device.queue.writeBuffer(uniformBuffers[pipelineName], 0, uniformData as ArrayBuffer);
+      }
+
+      const bindGroup = getOrCreateBindGroup(pipelineName, pipelineInfo, inputTextureView);
+
       const passEncoder = commandEncoder.beginRenderPass({
-        colorAttachments: [{
-          view: targetView,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        }],
+        colorAttachments: [
+          {
+            view: targetView,
+            loadOp: 'clear',
+            storeOp: 'store',
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
       });
 
       passEncoder.setPipeline(pipelineInfo.pipeline);
@@ -469,15 +570,8 @@ export class WebGPUBackend extends BaseBackend {
       passEncoder.draw(4);
       passEncoder.end();
 
-      device.queue.submit([commandEncoder.finish()]);
-
       if (target) {
         inputTextureView = target.view;
-      }
-
-      // 清理临时缓冲区
-      if (uniformBuffer) {
-        uniformBuffer.destroy();
       }
     };
 
@@ -512,7 +606,7 @@ export class WebGPUBackend extends BaseBackend {
     }
 
     // Brightness
-    {
+    if (Math.abs(settings.brightness) > 0.5) {
       const data = new Float32Array([settings.brightness / 200]);
       runPass('brightness', data.buffer);
     }
@@ -529,11 +623,9 @@ export class WebGPUBackend extends BaseBackend {
       runPass('contrast', matrix.buffer);
     }
 
-    // Blacks - 使用 palette texture
+    // Blacks - palette texture 作为额外 binding，由 bindGroupCache 自动复用
     if (Math.abs(settings.blacks) > 0.5 && paletteTexture && paletteTextureView) {
-      // 更新 palette texture
       const paletteData = buildBlackPalette(settings.blacks);
-      // 将 RGB 数据扩展为 RGBA
       const rgbaData = new Uint8Array(256 * 4);
       for (let i = 0; i < 256; i++) {
         rgbaData[i * 4] = paletteData[i * 3];
@@ -545,42 +637,9 @@ export class WebGPUBackend extends BaseBackend {
         { texture: paletteTexture },
         rgbaData,
         { bytesPerRow: 256 * 4 },
-        { width: 256, height: 1 }
+        { width: 256, height: 1 },
       );
-
-      // 运行 blacks pass
-      const pipelineInfo = pipelines.blacks;
-      const target = swapTarget();
-      const targetView = target.view;
-
-      const bindGroup = device.createBindGroup({
-        layout: pipelineInfo.bindGroupLayout,
-        entries: [
-          { binding: 0, resource: inputTextureView },
-          { binding: 1, resource: sampler },
-          { binding: 2, resource: paletteTextureView },
-          { binding: 3, resource: sampler },
-        ],
-      });
-
-      const commandEncoder = device.createCommandEncoder();
-      const passEncoder = commandEncoder.beginRenderPass({
-        colorAttachments: [{
-          view: targetView,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        }],
-      });
-
-      passEncoder.setPipeline(pipelineInfo.pipeline);
-      passEncoder.setVertexBuffer(0, vertexBuffer);
-      passEncoder.setBindGroup(0, bindGroup);
-      passEncoder.draw(4);
-      passEncoder.end();
-
-      device.queue.submit([commandEncoder.finish()]);
-      inputTextureView = target.view;
+      runPass('blacks');
     }
 
     // Whites
@@ -628,8 +687,22 @@ export class WebGPUBackend extends BaseBackend {
     // Sharpen
     if (settings.sharpen > 0.5) {
       const data = new Float32Array([
-        1 / width, 1 / height, settings.sharpen / 100, 0,
-        0, -1, 0, -1, 5, -1, 0, -1, 0, 0, 0, 0
+        1 / width,
+        1 / height,
+        settings.sharpen / 100,
+        0,
+        0,
+        -1,
+        0,
+        -1,
+        5,
+        -1,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0,
       ]);
       runPass('kernel', data.buffer);
     }
@@ -638,32 +711,40 @@ export class WebGPUBackend extends BaseBackend {
     if (settings.smooth > 0.5) {
       const k = 1 / 9;
       const data = new Float32Array([
-        1 / width, 1 / height, settings.smooth / 100, 0,
-        k, k, k, k, k, k, k, k, k, 0, 0, 0
+        1 / width,
+        1 / height,
+        settings.smooth / 100,
+        0,
+        k,
+        k,
+        k,
+        k,
+        k,
+        k,
+        k,
+        k,
+        k,
+        0,
+        0,
+        0,
       ]);
       runPass('kernel', data.buffer);
     }
 
-    // Blur (horizontal)
-    {
-      const data = new Float32Array([settings.blur / width, 0, 0, 0]);
-      runPass('blur', data.buffer);
-    }
-
-    // Blur (vertical)
-    {
-      const data = new Float32Array([0, settings.blur / height, 0, 0]);
-      runPass('blur', data.buffer);
+    // Blur (horizontal + vertical)
+    if (Math.abs(settings.blur) > 0.5) {
+      runPass('blur', new Float32Array([settings.blur / width, 0, 0, 0]).buffer);
+      runPass('blur', new Float32Array([0, settings.blur / height, 0, 0]).buffer);
     }
 
     // Vignette
-    {
+    if (Math.abs(settings.vignette) > 0.5) {
       const data = new Float32Array([settings.vignette / 100, 0.25, 0, 0]);
       runPass('vignette', data.buffer);
     }
 
     // Grain
-    {
+    if (Math.abs(settings.grain) > 0.5) {
       const data = new Float32Array([width, height, settings.grain / 800, 0]);
       runPass('grain', data.buffer);
     }
@@ -671,7 +752,9 @@ export class WebGPUBackend extends BaseBackend {
     // Final pass to canvas
     const canvasTexture = context.getCurrentTexture();
     runPass('pass', undefined, canvasTexture.createView());
+
+    device.queue.submit([commandEncoder.finish()]);
   }
 }
 
-export type { WebGPUResources, WebGPUPipelineInfo, WebGPURenderTarget } from './types';
+export type { WebGPUPipelineInfo, WebGPURenderTarget, WebGPUResources } from './types';

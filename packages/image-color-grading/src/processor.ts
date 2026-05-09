@@ -1,16 +1,21 @@
-import type {
-  ColorGradingSettings,
-  PartialColorGradingSettings,
-  ExportOptions,
-  ImageLevels,
-  ImageAnalysis,
-  PresetType,
-  ProcessorOptions,
-  BackendType,
-} from './types';
-import { BaseBackend, selectBestBackend, isWebGPUSupported, isWebGLSupported } from './backends/base';
+import {
+  BaseBackend,
+  isWebGLSupported,
+  isWebGPUSupported,
+  selectBestBackend,
+} from './backends/base';
 import { WebGLBackend } from './backends/webgl';
 import { WebGPUBackend } from './backends/webgpu';
+import type {
+  BackendType,
+  ColorGradingSettings,
+  ExportOptions,
+  ImageAnalysis,
+  ImageLevels,
+  PartialColorGradingSettings,
+  PresetType,
+  ProcessorOptions,
+} from './types';
 
 /**
  * 默认设置
@@ -94,7 +99,7 @@ export function analyzeImageLevels(imageData: ImageData): ImageLevels {
 
   // 统计每个颜色值的出现次数
   for (let i = 0; i < data.length; i += 4) {
-    histogram[data[i]] += 1;     // R
+    histogram[data[i]] += 1; // R
     histogram[data[i + 1]] += 1; // G
     histogram[data[i + 2]] += 1; // B
   }
@@ -135,7 +140,7 @@ export function analyzeImageLevels(imageData: ImageData): ImageLevels {
  */
 export function analyzeImageVibrance(imageData: ImageData): number {
   const { data, width, height } = imageData;
-  let saturationSum = 1;  // 初始值为1，避免除零
+  let saturationSum = 1; // 初始值为1，避免除零
   let brightnessSum = 1;
 
   // 遍历所有像素
@@ -177,17 +182,17 @@ export function analyzeImage(imageData: ImageData): ImageAnalysis {
 
 /**
  * 图像调色处理器
- * 
+ *
  * 支持 WebGL 和 WebGPU 双后端，自动降级
  *
  * @example
  * ```ts
  * // 默认自动选择后端
  * const processor = new ImageColorGrading();
- * 
+ *
  * // 指定使用 WebGPU
  * const processor = new ImageColorGrading({ backend: 'webgpu' });
- * 
+ *
  * await processor.loadImage('path/to/image.jpg');
  * processor.setSettings({ brightness: 20, contrast: 10 });
  * processor.render();
@@ -308,12 +313,12 @@ export class ImageColorGrading {
    */
   async loadImage(url: string): Promise<void> {
     await this.ensureBackend();
-    
+
     return new Promise((resolve, reject) => {
       const image = new Image();
       image.crossOrigin = 'anonymous';
       image.onload = () => {
-        this.backend!.loadFromImage(image);
+        this.backend?.loadFromImage(image);
         this.imageLoaded = true;
         this.render();
         resolve();
@@ -331,7 +336,7 @@ export class ImageColorGrading {
    */
   async loadFromImage(image: HTMLImageElement): Promise<void> {
     await this.ensureBackend();
-    this.backend!.loadFromImage(image);
+    this.backend?.loadFromImage(image);
     this.imageLoaded = true;
     this.render();
   }
@@ -356,7 +361,7 @@ export class ImageColorGrading {
    */
   async loadFromImageData(imageData: ImageData): Promise<void> {
     await this.ensureBackend();
-    this.backend!.loadFromImageData(imageData);
+    this.backend?.loadFromImageData(imageData);
     this.imageLoaded = true;
     this.render();
   }
@@ -405,7 +410,7 @@ export class ImageColorGrading {
           }
         },
         format,
-        quality
+        quality,
       );
     });
   }
