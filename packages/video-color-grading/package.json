@@ -1,0 +1,55 @@
+{
+  "name": "video-color-grading",
+  "version": "1.0.0",
+  "description": "基于 WebGL/WebGPU 的视频实时调色库，支持调色参数 + LUT 应用 + MP4/WebM 导出",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "keywords": [
+    "video",
+    "color",
+    "grading",
+    "lut",
+    "webgpu",
+    "webgl",
+    "mediabunny",
+    "调色",
+    "视频"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@webgpu/types": "^0.1.69",
+    "terser": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "color-grading-core": "workspace:*",
+    "mediabunny": "^1.44.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "sideEffects": false
+}

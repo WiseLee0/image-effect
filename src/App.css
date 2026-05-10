@@ -5,13 +5,51 @@
  .page {
   min-height: 100vh;
   height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  gap: 32px;
-  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 32px 32px;
   background: radial-gradient(circle at top left, #2d3138, #111216 55%, #0b0c0f);
   color: #f1f3f8;
   overflow: hidden;
+ }
+
+ .page__tabs {
+  display: flex;
+  gap: 8px;
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 4px;
+ }
+
+ .page__tab {
+  background: transparent;
+  border: none;
+  color: rgba(241, 243, 248, 0.7);
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+ }
+ .page__tab:hover {
+  color: #f1f3f8;
+ }
+ .page__tab--active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+ }
+
+ .page__main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 32px;
  }
 
  .panel {
@@ -22,12 +60,40 @@
   gap: 8px;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 80px);
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  position: relative;
  }
  .panel__content{
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 28px;
+ }
+
+ .lut-row {
+  display: flex;
+  gap: 8px;
+ }
+ .lut-name {
+  font-size: 12px;
+  color: rgba(180, 190, 210, 0.85);
+  word-break: break-all;
+ }
+
+ .stage__hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #eef1f8;
+  pointer-events: none;
  }
 
  .panel__header {
@@ -148,9 +214,19 @@
   flex-direction: column;
   gap: 18px;
   align-items: center;
+  position: relative;
+  min-height: 0;
+  min-width: 0;
  }
 
  .stage__frame {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
   border-radius: 26px;
   background: linear-gradient(140deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
@@ -161,8 +237,10 @@
 
  .stage__canvas {
   display: block;
-  max-width: min(72vw, 880px);
-  max-height: 78vh;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   border-radius: 18px;
   background: #0a0b0f;
  }
@@ -175,6 +253,8 @@
 
 .stage__file {
  position: absolute;
+ top: 0;
+ left: 0;
  width: 1px;
  height: 1px;
  padding: 0;
