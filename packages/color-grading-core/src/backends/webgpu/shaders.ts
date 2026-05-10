@@ -793,7 +793,150 @@ fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   lum = lum + luminance;
   let finalNoise = mix(noise, vec3<f32>(0.0), pow(lum, 4.0));
   col = col + finalNoise * params.amount;
-  
+
   return vec4<f32>(col, tex.a);
+}
+`;
+
+/**
+ * 肤色保护 mask（WGSL 共享函数）
+ *
+ * 双判据：
+ *   1. Kovac RGB 约束（论文经典阈值，对人种鲁棒）：肤色满足 R>G>B 且 R/G、R/B 差异充分
+ *   2. YCbCr 椭圆（细化在 Cb-Cr 平面的肤色聚类）
+ * 用 smoothstep 替代 step 让边缘平滑，避免硬切口贴片感。
+ *
+ * 注意：mask 必须在「原图 RGB」上计算 —— LUT 后的 cb/cr 已被破坏，无法判断。
+ * 输入 rgb 已 clamp 到 [0,1]，hsv 由 rgb2hsv 给出。
+ * 返回值 [0,1]：1 = 完全是肤色，0 = 完全非肤色。
+ */
+export const skinMaskWGSL = `
+fn skinMask(rgb: vec3<f32>, hsv: vec3<f32>) -> f32 {
+  // === Kovac RGB 约束（论文 RGB-H-CbCr）===
+  // 原阈值 (R>95, G>40, B>20) 已除以 255，并加 ±10 的 smoothstep 软过渡
+  let r = rgb.r;
+  let g = rgb.g;
+  let b = rgb.b;
+
+  // 基础亮度门槛
+  let rOk = smoothstep(0.33, 0.40, r);
+  let gOk = smoothstep(0.13, 0.20, g);
+  let bOk = smoothstep(0.06, 0.12, b);
+
+  // 色彩动态范围（避免灰色）：max-min > 15/255
+  let maxC = max(r, max(g, b));
+  let minC = min(r, min(g, b));
+  let rangeOk = smoothstep(0.04, 0.10, maxC - minC);
+
+  // R 必须显著大于 G（肤色关键特征：偏红/橙）
+  let rgDiff = smoothstep(0.02, 0.06, r - g);
+  // R 必须 > B（暖色，非紫/蓝）
+  let rbDiff = smoothstep(0.0, 0.03, r - b);
+
+  let kovac = rOk * gOk * bOk * rangeOk * rgDiff * rbDiff;
+
+  // === YCbCr 椭圆（细化判据）===
+  // 椭圆中心 (Cb=0.42, Cr=0.61)，半轴 0.10/0.07 — 比之前收紧
+  let cb = -0.169 * r - 0.331 * g + 0.500 * b + 0.5;
+  let cr =  0.500 * r - 0.419 * g - 0.081 * b + 0.5;
+  let dCb = (cb - 0.42) / 0.10;
+  let dCr = (cr - 0.61) / 0.07;
+  let cbcrMask = 1.0 - smoothstep(0.80, 1.05, sqrt(dCb * dCb + dCr * dCr));
+
+  // === 极端亮度排除 ===
+  let lumaMask = 1.0 - smoothstep(0.96, 1.0, hsv.z);
+
+  return kovac * cbcrMask * lumaMask;
+}
+`;
+
+/**
+ * LUT 应用 + 肤色保护
+ *
+ * binding 0/1：源纹理 + 采样器
+ * binding 2：参数 (intensity, skinProtection, useSegMask, _pad)
+ * binding 3：3D LUT 纹理
+ * binding 4：LUT 采样器（开 trilinear）
+ * binding 5：分割 mask 纹理（R 通道：1=皮肤，0=非皮肤；未启用时为 1×1 全白占位）
+ * binding 6：分割 mask 采样器
+ *
+ * 算法（剪映/CapCut 同款）：finalColor = mix(lutColor, originalRgb, mask × skinProtection)
+ *
+ * mask 来源（按可用性挑选最强信号）：
+ *   - 启用语义分割：直接用 SelfieMulticlass 的 face-skin/body-skin 输出，最准
+ *   - 未启用/未就绪：回落到 Kovac+YCbCr 像素判据
+ *   - 启用且像素判据可信时：取交集（语义 mask 兜底定位人体范围，像素判据细化皮肤区域）
+ *
+ * mask 必须在「原图 RGB」上计算 —— LUT 后的 cb/cr 已被破坏。
+ */
+export const lutFragment = `
+struct Params {
+  intensity: f32,
+  skinProtection: f32,
+  useSegMask: f32,
+  _pad: f32,
+}
+
+@group(0) @binding(0) var uTexture: texture_2d<f32>;
+@group(0) @binding(1) var uSampler: sampler;
+@group(0) @binding(2) var<uniform> params: Params;
+@group(0) @binding(3) var uLUT: texture_3d<f32>;
+@group(0) @binding(4) var uLUTSampler: sampler;
+@group(0) @binding(5) var uSegMask: texture_2d<f32>;
+@group(0) @binding(6) var uSegMaskSampler: sampler;
+
+fn rgb2hsv(c: vec3<f32>) -> vec3<f32> {
+  let K = vec4<f32>(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+  let p = mix(vec4<f32>(c.bg, K.wz), vec4<f32>(c.gb, K.xy), vec4<f32>(step(c.b, c.g)));
+  let q = mix(vec4<f32>(p.xyw, c.r), vec4<f32>(c.r, p.yzx), vec4<f32>(step(p.x, c.r)));
+  let d = q.x - min(q.w, q.y);
+  let e = 1.0e-10;
+  return vec3<f32>(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+${skinMaskWGSL}
+
+// 9-tap max dilation：mask 在 ±4 像素邻域内的最大值。
+// 用途：异步分割落后视频 2-3 帧时，dilate 把"上一帧 mask"扩张到能罩住"当前帧"
+// 的运动范围，避免快速运动（如挥手）出现保护色斑漂移。
+// textureDimensions 直接拿 mask 实际尺寸，无需 uniform。
+// sampler 是 LINEAR + CLAMP_TO_EDGE，超界采样回到边缘；未启用时 mask 是
+// 1×1 全白占位，texel=1，9 个采样全部 clamp 到中心，结果不变。
+fn sampleSegMaskDilated(uv: vec2<f32>) -> f32 {
+  let dim = vec2<f32>(textureDimensions(uSegMask));
+  let d = vec2<f32>(4.0) / dim;
+  var m = textureSample(uSegMask, uSegMaskSampler, uv).r;
+  m = max(m, textureSample(uSegMask, uSegMaskSampler, uv + vec2<f32>( d.x,  0.0)).r);
+  m = max(m, textureSample(uSegMask, uSegMaskSampler, uv + vec2<f32>(-d.x,  0.0)).r);
+  m = max(m, textureSample(uSegMask, uSegMaskSampler, uv + vec2<f32>( 0.0,  d.y)).r);
+  m = max(m, textureSample(uSegMask, uSegMaskSampler, uv + vec2<f32>( 0.0, -d.y)).r);
+  m = max(m, textureSample(uSegMask, uSegMaskSampler, uv + vec2<f32>( d.x,  d.y)).r);
+  m = max(m, textureSample(uSegMask, uSegMaskSampler, uv + vec2<f32>( d.x, -d.y)).r);
+  m = max(m, textureSample(uSegMask, uSegMaskSampler, uv + vec2<f32>(-d.x,  d.y)).r);
+  m = max(m, textureSample(uSegMask, uSegMaskSampler, uv + vec2<f32>(-d.x, -d.y)).r);
+  return m;
+}
+
+@fragment
+fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+  let base = textureSample(uTexture, uSampler, uv);
+  let rgb = clamp(base.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
+  let lutColor = textureSample(uLUT, uLUTSampler, rgb).rgb;
+  let mixed = mix(rgb, lutColor, params.intensity);
+
+  let baseHsv = rgb2hsv(rgb);
+  let pixelMask = skinMask(rgb, baseHsv);
+
+  // mask 选择策略：
+  //   - MediaPipe 启用时：直接信任 segMask。pixelMask 在脸部高光区会被
+  //     Kovac 的 rgDiff/lumaMask 砍到 0，与 segMask 相乘会在鼻梁/额头/下巴
+  //     留下"白色窟窿"。语义分割已经精确定位了皮肤，不需要像素判据二次裁剪。
+  //   - MediaPipe 未启用：回落到纯 pixelMask
+  let segR = sampleSegMaskDilated(uv);
+  let mask = mix(pixelMask, segR, params.useSegMask) * params.skinProtection;
+
+  // RGB 全通道回拉：肤色区域按 mask 强度从 LUT 结果插值回原图
+  let finalColor = mix(mixed, rgb, mask);
+
+  return vec4<f32>(finalColor, base.a);
 }
 `;
